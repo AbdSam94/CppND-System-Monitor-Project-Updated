@@ -2,48 +2,73 @@
 #include <unistd.h>
 #include <string>
 #include <vector>
-
 #include "linux_parser.h"
 
 using std::stof;
 using std::string;
 using std::to_string;
 using std::vector;
+using std::ifstream;
+using std::replace;
+using std::getline;
+using std::find;
+using std::istringstream;
 
-// DONE: An example of how to read data from the filesystem
-string LinuxParser::OperatingSystem() {
-  string line;
-  string key;
-  string value;
-  std::ifstream filestream(kOSPath);
-  if (filestream.is_open()) {
-    while (std::getline(filestream, line)) {
-      std::replace(line.begin(), line.end(), ' ', '_');
-      std::replace(line.begin(), line.end(), '=', ' ');
-      std::replace(line.begin(), line.end(), '"', ' ');
-      std::istringstream linestream(line);
-      while (linestream >> key >> value) {
-        if (key == "PRETTY_NAME") {
-          std::replace(value.begin(), value.end(), '_', ' ');
-          return value;
+vector<string> parser(string path, vector<vector<char>> replacements, vector<string> keys = {}, int index = 0)
+{
+  vector<string> result;
+  string line, key, value;
+  ifstream filestream(path);
+  if (filestream.is_open()) 
+  {
+    while (getline(filestream, line)) 
+    {
+      for(auto& replacement : replacements)
+      {
+        replace(line.begin(), line.end(), replacement[0], replacement[1]);
+      }
+      istringstream linestream(line);
+      if (keys.empty())
+      {
+        for(int i=0; i<index; i++)
+        {
+          linestream >> value;
+        }
+        result.push_back(value);
+      }
+      else
+      {
+        while (linestream >> key >> value) 
+        {
+          if(keys.end() != find(keys.begin(), keys.end(), key))
+          {
+            for(auto& replacement : replacements)
+            {
+              replace(value.begin(), value.end(), replacement[1], replacement[0]);
+            }
+            result.push_back(value);
+          }
         }
       }
+      filestream.close();
+      return result;
     }
   }
-  return value;
+}
+// DONE: An example of how to read data from the filesystem
+string LinuxParser::OperatingSystem() 
+{
+  vector<string> result;
+  result = parser(kOSPath, {{' ', '_'}, {'=', ' '}, {'"', ' '}},{"PRETTY_NAME"});
+  return result[0];
 }
 
 // DONE: An example of how to read data from the filesystem
-string LinuxParser::Kernel() {
-  string os, kernel;
-  string line;
-  std::ifstream stream(kProcDirectory + kVersionFilename);
-  if (stream.is_open()) {
-    std::getline(stream, line);
-    std::istringstream linestream(line);
-    linestream >> os >> kernel;
-  }
-  return kernel;
+string LinuxParser::Kernel() 
+{
+  vector<string> result;
+  result = parser(kProcDirectory + kVersionFilename, {}, {}, 3);
+  return result[0];
 }
 
 // BONUS: Update this to use std::filesystem
@@ -67,7 +92,33 @@ vector<int> LinuxParser::Pids() {
 }
 
 // TODO: Read and return the system memory utilization
-float LinuxParser::MemoryUtilization() { return 0.0; }
+float LinuxParser::MemoryUtilization() 
+{
+  int memTotal, memFree;
+  string line;
+  string key;
+  string value;
+  std::ifstream stream(kProcDirectory + kMeminfoFilename);
+  if (stream.is_open()) 
+  {
+    while (std::getline(stream, line)) 
+    {
+      std::istringstream linestream(line);
+      while (linestream >> key >> value) 
+      {
+        if (key == "MemTotal:") 
+        {
+          memTotal = stoi(value);
+        }
+        else if(key == "MemFree:")
+        {
+          memFree =stoi(value);
+        }
+      }
+    }
+    return memTotal - memFree;
+  }
+}
 
 // TODO: Read and return the system uptime
 long LinuxParser::UpTime() { return 0; }
