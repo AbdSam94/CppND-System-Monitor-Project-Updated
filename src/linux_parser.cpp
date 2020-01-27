@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "linux_parser.h"
+#include <iostream>
 
 using std::stof;
 using std::string;
@@ -35,31 +36,35 @@ vector<string> parser(string path, vector<vector<char>> replacements, vector<str
           linestream >> value;
         }
         result.push_back(value);
+        break;
       }
       else
       {
-        while (linestream >> key >> value) 
+        linestream >> key;
+        if(keys.end() != find(keys.begin(), keys.end(), key))
         {
-          if(keys.end() != find(keys.begin(), keys.end(), key))
+          while (linestream >> value)
           {
-            for(auto& replacement : replacements)
+            for(int i = replacements.size() - 1; i >= 0; i--)
             {
-              replace(value.begin(), value.end(), replacement[1], replacement[0]);
+              replace(value.begin(), value.end(), replacements[i][1], replacements[i][0]);
             }
             result.push_back(value);
           }
         }
       }
-      filestream.close();
-      return result;
     }
+    filestream.close();
+    return result;
   }
 }
 // DONE: An example of how to read data from the filesystem
 string LinuxParser::OperatingSystem() 
 {
   vector<string> result;
-  result = parser(kOSPath, {{' ', '_'}, {'=', ' '}, {'"', ' '}},{"PRETTY_NAME"});
+  vector<vector<char>> const replacements ={{' ', '_'}, {'=', ' '}, {'"', ' '}};
+  vector<string> keys = {"PRETTY_NAME"};
+  result = parser(kOSPath, replacements, keys, 0);
   return result[0];
 }
 
@@ -94,37 +99,32 @@ vector<int> LinuxParser::Pids() {
 // TODO: Read and return the system memory utilization
 float LinuxParser::MemoryUtilization() 
 {
-  int memTotal, memFree;
-  string line;
-  string key;
-  string value;
-  std::ifstream stream(kProcDirectory + kMeminfoFilename);
-  if (stream.is_open()) 
-  {
-    while (std::getline(stream, line)) 
-    {
-      std::istringstream linestream(line);
-      while (linestream >> key >> value) 
-      {
-        if (key == "MemTotal:") 
-        {
-          memTotal = stoi(value);
-        }
-        else if(key == "MemFree:")
-        {
-          memFree =stoi(value);
-        }
-      }
-    }
-    return memTotal - memFree;
-  }
+  vector<string> result;
+  vector<string> keys = {"MemTotal:", "MemFree:"};
+  result = parser(kProcDirectory + kMeminfoFilename, {}, keys);
+  return stof(result[0]) - stof(result[2]);
 }
 
 // TODO: Read and return the system uptime
-long LinuxParser::UpTime() { return 0; }
+long LinuxParser::UpTime() 
+{ 
+  vector<string> result;
+  result = parser(kProcDirectory + kUptimeFilename, {}, {}, 1);
+  return stol(result[0]);
+}
 
 // TODO: Read and return the number of jiffies for the system
-long LinuxParser::Jiffies() { return 0; }
+long LinuxParser::Jiffies() 
+{ 
+  vector<string> result;
+  long totalJiffies = 0;
+  result = parser(kProcDirectory + kStatFilename, {}, {"cpu"});
+  for (auto& res : result)
+  {
+    totalJiffies += stol(res);
+  }
+  return totalJiffies;
+}
 
 // TODO: Read and return the number of active jiffies for a PID
 // REMOVE: [[maybe_unused]] once you define the function
