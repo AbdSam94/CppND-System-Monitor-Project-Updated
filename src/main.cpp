@@ -71,9 +71,14 @@ int main() {
   /*vector<string> result;
   result = x::parser("/etc/os-release", {{' ', '_'}, {'=', ' '}, {'"', ' '}},{"PRETTY_NAME"});
   std::cout << result[0] << "\n";*/
-  std::cout << LinuxParser::UpTime() << "\n";
+  /*std::cout << LinuxParser::UpTime() << "\n";
   std::cout << LinuxParser::MemoryUtilization() << "\n";
   std::cout << LinuxParser::OperatingSystem() << "\n";
   std::cout << LinuxParser::Kernel() << "\n";
   std::cout << LinuxParser::Jiffies() << "\n";
+  std::cout << LinuxParser::ActiveJiffies() << "\n";
+  std::cout << LinuxParser::IdleJiffies() << "\n";
+  std::cout << LinuxParser::TotalProcesses() << "\n";
+  std::cout << LinuxParser::RunningProcesses() << "\n";*/
+  std::cout << LinuxParser::Command(1345) << "\n";
 }

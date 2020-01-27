@@ -35,6 +35,10 @@ vector<string> parser(string path, vector<vector<char>> replacements, vector<str
         {
           linestream >> value;
         }
+        for(int i = replacements.size() - 1; i >= 0; i--)
+        {
+          replace(value.begin(), value.end(), replacements[i][1], replacements[i][0]);
+        }
         result.push_back(value);
         break;
       }
@@ -96,7 +100,7 @@ vector<int> LinuxParser::Pids() {
   return pids;
 }
 
-// TODO: Read and return the system memory utilization
+// Reads and returns the system memory utilization
 float LinuxParser::MemoryUtilization() 
 {
   vector<string> result;
@@ -105,7 +109,7 @@ float LinuxParser::MemoryUtilization()
   return stof(result[0]) - stof(result[2]);
 }
 
-// TODO: Read and return the system uptime
+// Reads and returns the system uptime
 long LinuxParser::UpTime() 
 { 
   vector<string> result;
@@ -113,7 +117,7 @@ long LinuxParser::UpTime()
   return stol(result[0]);
 }
 
-// TODO: Read and return the number of jiffies for the system
+// Reads and returns the number of jiffies for the system
 long LinuxParser::Jiffies() 
 { 
   vector<string> result;
@@ -126,28 +130,69 @@ long LinuxParser::Jiffies()
   return totalJiffies;
 }
 
-// TODO: Read and return the number of active jiffies for a PID
+// Reads and returns the number of active jiffies for a PID
 // REMOVE: [[maybe_unused]] once you define the function
 long LinuxParser::ActiveJiffies(int pid[[maybe_unused]]) { return 0; }
 
 // TODO: Read and return the number of active jiffies for the system
-long LinuxParser::ActiveJiffies() { return 0; }
+long LinuxParser::ActiveJiffies() 
+{  
+  vector<string> result;
+  long activeJiffies = 0;
+  result = parser(kProcDirectory + kStatFilename, {}, {"cpu"});
+  int indexes [6]= {0, 1, 2, 5, 6, 7};
+  for(int index : indexes)
+  {
+    activeJiffies += stol(result[index]);
+  }
+  return activeJiffies;
+}
 
-// TODO: Read and return the number of idle jiffies for the system
-long LinuxParser::IdleJiffies() { return 0; }
+// Reads and returns the number of idle jiffies for the system
+long LinuxParser::IdleJiffies() 
+{ 
+  vector<string> result;
+  long idleJiffies = 0;
+  result = parser(kProcDirectory + kStatFilename, {}, {"cpu"});
+  int indexes [2]= {3, 4};
+  for(int index : indexes)
+  {
+    idleJiffies += stol(result[index]);
+  }
+  return idleJiffies;
+}
 
 // TODO: Read and return CPU utilization
 vector<string> LinuxParser::CpuUtilization() { return {}; }
 
-// TODO: Read and return the total number of processes
-int LinuxParser::TotalProcesses() { return 0; }
+// Reads and returns the total number of processes
+int LinuxParser::TotalProcesses() 
+{ 
+  vector<string> result;
+  long idleJiffies = 0;
+  result = parser(kProcDirectory + kStatFilename, {}, {"processes"});
+  return stoi(result[0]);
+}
 
-// TODO: Read and return the number of running processes
-int LinuxParser::RunningProcesses() { return 0; }
+// Reads and returns the number of running processes
+int LinuxParser::RunningProcesses() 
+{ 
+  vector<string> result;
+  long idleJiffies = 0;
+  result = parser(kProcDirectory + kStatFilename, {}, {"procs_running"});
+  return stoi(result[0]);
+}
 
 // TODO: Read and return the command associated with a process
 // REMOVE: [[maybe_unused]] once you define the function
-string LinuxParser::Command(int pid[[maybe_unused]]) { return string(); }
+string LinuxParser::Command(int pid) 
+{ 
+  vector<string> result;
+  vector<vector<char>> const replacements = {{' ', '_'}};
+  string path = kProcDirectory + to_string(pid) + kCmdlineFilename;
+  result = parser(path, replacements, {}, 1);
+  return result[0]; 
+}
 
 // TODO: Read and return the memory used by a process
 // REMOVE: [[maybe_unused]] once you define the function
