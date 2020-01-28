@@ -4,6 +4,7 @@
 #include <vector>
 #include "linux_parser.h"
 #include <iostream>
+#include <unistd.h>
 
 using std::stof;
 using std::string;
@@ -15,7 +16,42 @@ using std::getline;
 using std::find;
 using std::istringstream;
 
-vector<string> parser(string path, vector<vector<char>> replacements, vector<string> keys = {}, int index = 0)
+void replaceChars(string& String, vector<vector<char>> replacements, bool reverse=false)
+{
+  if(reverse)
+  {
+    for(int i = replacements.size() - 1; i >= 0; i--)
+    {
+      replace(String.begin(), String.end(), replacements[i][1], replacements[i][0]);
+    }
+  }
+  else
+  {
+    for(auto& replacement : replacements)
+    {
+      replace(String.begin(), String.end(), replacement[0], replacement[1]);
+    }    
+  }
+  
+}
+
+void parseWithIndexes(vector<string>& result, vector<int> indexes, istringstream& linestream, vector<vector<char>> replacements)
+{
+  int counter = 0;
+  string value;
+  for(int i = 1; i<=indexes[indexes.size() - 1]; i++)
+  {
+    linestream >> value;
+    if(i == indexes[counter])
+    {
+      replaceChars(value, replacements, true);
+      result.push_back(value);
+      counter++;
+    }
+  }
+}
+
+vector<string> superParser(string path, vector<vector<char>> replacements, vector<string> keys = {}, vector<int> indexes = {})
 {
   vector<string> result;
   string line, key, value;
@@ -24,22 +60,11 @@ vector<string> parser(string path, vector<vector<char>> replacements, vector<str
   {
     while (getline(filestream, line)) 
     {
-      for(auto& replacement : replacements)
-      {
-        replace(line.begin(), line.end(), replacement[0], replacement[1]);
-      }
+      replaceChars(line, replacements);
       istringstream linestream(line);
       if (keys.empty())
       {
-        for(int i=0; i<index; i++)
-        {
-          linestream >> value;
-        }
-        for(int i = replacements.size() - 1; i >= 0; i--)
-        {
-          replace(value.begin(), value.end(), replacements[i][1], replacements[i][0]);
-        }
-        result.push_back(value);
+        parseWithIndexes(result, indexes, linestream, replacements);
         break;
       }
       else
@@ -49,18 +74,19 @@ vector<string> parser(string path, vector<vector<char>> replacements, vector<str
         {
           while (linestream >> value)
           {
-            for(int i = replacements.size() - 1; i >= 0; i--)
-            {
-              replace(value.begin(), value.end(), replacements[i][1], replacements[i][0]);
-            }
+            replaceChars(value, replacements, true);
             result.push_back(value);
           }
         }
       }
     }
     filestream.close();
-    return result;
   }
+  if(result.size() == 0)
+  {
+    result = {"0"};
+  }
+  return result;
 }
 // DONE: An example of how to read data from the filesystem
 string LinuxParser::OperatingSystem() 
@@ -68,7 +94,7 @@ string LinuxParser::OperatingSystem()
   vector<string> result;
   vector<vector<char>> const replacements ={{' ', '_'}, {'=', ' '}, {'"', ' '}};
   vector<string> keys = {"PRETTY_NAME"};
-  result = parser(kOSPath, replacements, keys, 0);
+  result = superParser(kOSPath, replacements, keys);
   return result[0];
 }
 
@@ -76,7 +102,7 @@ string LinuxParser::OperatingSystem()
 string LinuxParser::Kernel() 
 {
   vector<string> result;
-  result = parser(kProcDirectory + kVersionFilename, {}, {}, 3);
+  result = superParser(kProcDirectory + kVersionFilename, {}, {}, {3});
   return result[0];
 }
 
@@ -105,7 +131,7 @@ float LinuxParser::MemoryUtilization()
 {
   vector<string> result;
   vector<string> keys = {"MemTotal:", "MemFree:"};
-  result = parser(kProcDirectory + kMeminfoFilename, {}, keys);
+  result = superParser(kProcDirectory + kMeminfoFilename, {}, keys);
   return stof(result[0]) - stof(result[2]);
 }
 
@@ -113,7 +139,7 @@ float LinuxParser::MemoryUtilization()
 long LinuxParser::UpTime() 
 { 
   vector<string> result;
-  result = parser(kProcDirectory + kUptimeFilename, {}, {}, 1);
+  result = superParser(kProcDirectory + kUptimeFilename, {}, {}, {1});
   return stol(result[0]);
 }
 
@@ -122,7 +148,7 @@ long LinuxParser::Jiffies()
 { 
   vector<string> result;
   long totalJiffies = 0;
-  result = parser(kProcDirectory + kStatFilename, {}, {"cpu"});
+  result = superParser(kProcDirectory + kStatFilename, {}, {"cpu"});
   for (auto& res : result)
   {
     totalJiffies += stol(res);
@@ -132,14 +158,23 @@ long LinuxParser::Jiffies()
 
 // Reads and returns the number of active jiffies for a PID
 // REMOVE: [[maybe_unused]] once you define the function
-long LinuxParser::ActiveJiffies(int pid[[maybe_unused]]) { return 0; }
+long LinuxParser::ActiveJiffies(int pid, long uptime)  
+{ 
+  vector<string> result;
+  long totalTime, seconds;
+  string path = kProcDirectory + to_string(pid) + kStatFilename;
+  result = superParser(path, {}, {}, {14, 15, 16, 17, 22});
+  totalTime = stol(result[0]) + stol(result[1]) + stol(result[2]) + stol(result[3]);
+  seconds = uptime - (stol(result[3]) / sysconf(_SC_CLK_TCK));
+  return 100 * ((totalTime/sysconf(_SC_CLK_TCK))/seconds);
+}
 
 // TODO: Read and return the number of active jiffies for the system
 long LinuxParser::ActiveJiffies() 
 {  
   vector<string> result;
   long activeJiffies = 0;
-  result = parser(kProcDirectory + kStatFilename, {}, {"cpu"});
+  result = superParser(kProcDirectory + kStatFilename, {}, {"cpu"});
   int indexes [6]= {0, 1, 2, 5, 6, 7};
   for(int index : indexes)
   {
@@ -153,7 +188,7 @@ long LinuxParser::IdleJiffies()
 { 
   vector<string> result;
   long idleJiffies = 0;
-  result = parser(kProcDirectory + kStatFilename, {}, {"cpu"});
+  result = superParser(kProcDirectory + kStatFilename, {}, {"cpu"});
   int indexes [2]= {3, 4};
   for(int index : indexes)
   {
@@ -169,8 +204,7 @@ vector<string> LinuxParser::CpuUtilization() { return {}; }
 int LinuxParser::TotalProcesses() 
 { 
   vector<string> result;
-  long idleJiffies = 0;
-  result = parser(kProcDirectory + kStatFilename, {}, {"processes"});
+  result = superParser(kProcDirectory + kStatFilename, {}, {"processes"});
   return stoi(result[0]);
 }
 
@@ -178,34 +212,67 @@ int LinuxParser::TotalProcesses()
 int LinuxParser::RunningProcesses() 
 { 
   vector<string> result;
-  long idleJiffies = 0;
-  result = parser(kProcDirectory + kStatFilename, {}, {"procs_running"});
+  result = superParser(kProcDirectory + kStatFilename, {}, {"procs_running"});
   return stoi(result[0]);
 }
 
-// TODO: Read and return the command associated with a process
-// REMOVE: [[maybe_unused]] once you define the function
+// Reads and returns the command associated with a process
 string LinuxParser::Command(int pid) 
 { 
   vector<string> result;
   vector<vector<char>> const replacements = {{' ', '_'}};
   string path = kProcDirectory + to_string(pid) + kCmdlineFilename;
-  result = parser(path, replacements, {}, 1);
+  result = superParser(path, replacements, {}, {1});
   return result[0]; 
 }
 
-// TODO: Read and return the memory used by a process
-// REMOVE: [[maybe_unused]] once you define the function
-string LinuxParser::Ram(int pid[[maybe_unused]]) { return string(); }
+// Reads and returns the memory used by a process
+string LinuxParser::Ram(int pid) 
+{ 
+  vector<string> result;
+  vector<vector<char>> const replacements = {{' ', '_'}};
+  string path = kProcDirectory + to_string(pid) + kStatusFilename;
+  result = superParser(path, {}, {"VmSize:"});
+  return to_string(stol(result[0])/1000) + " " + result[1];
+}
 
-// TODO: Read and return the user ID associated with a process
-// REMOVE: [[maybe_unused]] once you define the function
-string LinuxParser::Uid(int pid[[maybe_unused]]) { return string(); }
+// Reads and returns the user ID associated with a process
+string LinuxParser::Uid(int pid) 
+{ 
+  vector<string> result;
+  string path = kProcDirectory + to_string(pid) + kStatusFilename;
+  result = superParser(path, {}, {"Uid:"});
+  return result[0]; 
+}
 
-// TODO: Read and return the user associated with a process
-// REMOVE: [[maybe_unused]] once you define the function
-string LinuxParser::User(int pid[[maybe_unused]]) { return string(); }
+// Reads and returns the user associated with a process
+string LinuxParser::User(int pid) 
+{ 
+  string line, userName, x, Id;
+  string Uid = LinuxParser::Uid(pid);
+  ifstream filestream(kPasswordPath);
+  if (filestream.is_open()) 
+  {
+    while (getline(filestream, line)) 
+    {
+      replaceChars(line, {{':', ' '}});
+      istringstream linestream(line);
+      linestream >> userName >> x >> Id;
+      if(Uid == Id)
+      {
+        break;
+      }
+    }
+    filestream.close();
+  }
+  return (userName == "") ? "": userName;
+}
 
-// TODO: Read and return the uptime of a process
-// REMOVE: [[maybe_unused]] once you define the function
-long LinuxParser::UpTime(int pid[[maybe_unused]]) { return 0; }
+// Reads and returns the uptime of a process
+long LinuxParser::UpTime(int pid) 
+{ 
+  vector<string> result;
+  string path = kProcDirectory + to_string(pid) + kStatFilename;
+  result = superParser(path, {}, {}, {14});
+  return stol(result[0])/sysconf(_SC_CLK_TCK); 
+}
