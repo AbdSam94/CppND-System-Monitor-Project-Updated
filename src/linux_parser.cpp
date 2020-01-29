@@ -158,14 +158,14 @@ long LinuxParser::Jiffies()
 
 // Reads and returns the number of active jiffies for a PID
 // REMOVE: [[maybe_unused]] once you define the function
-long LinuxParser::ActiveJiffies(int pid, long uptime)  
+long LinuxParser::ActiveJiffies(int pid)  
 { 
   vector<string> result;
   long totalTime, seconds;
   string path = kProcDirectory + to_string(pid) + kStatFilename;
   result = superParser(path, {}, {}, {14, 15, 16, 17, 22});
   totalTime = stol(result[0]) + stol(result[1]) + stol(result[2]) + stol(result[3]);
-  seconds = uptime - (stol(result[3]) / sysconf(_SC_CLK_TCK));
+  seconds = UpTime() - (stol(result[3]) / sysconf(_SC_CLK_TCK));
   return 100 * ((totalTime/sysconf(_SC_CLK_TCK))/seconds);
 }
 
