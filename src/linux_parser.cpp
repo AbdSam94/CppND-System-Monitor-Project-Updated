@@ -16,6 +16,15 @@ using std::getline;
 using std::find;
 using std::istringstream;
 
+
+void sumAccordingToIndexes(long& sum, const vector<int> indexes, vector<string> parsedData)
+{
+  for(int index : indexes)
+  {
+    sum += stol(parsedData[index]);
+  }
+}
+
 void replaceChars(string& String, vector<vector<char>> replacements, bool reverse=false)
 {
   if(reverse)
@@ -149,10 +158,8 @@ long LinuxParser::Jiffies()
   vector<string> result;
   long totalJiffies = 0;
   result = superParser(kProcDirectory + kStatFilename, {}, {"cpu"});
-  for (auto& res : result)
-  {
-    totalJiffies += stol(res);
-  }
+  const vector<int> indexes = {0, 1, 2, 3, 4, 5, 6, 7};
+  sumAccordingToIndexes(totalJiffies, indexes, result);
   return totalJiffies;
 }
 
@@ -175,11 +182,8 @@ long LinuxParser::ActiveJiffies()
   vector<string> result;
   long activeJiffies = 0;
   result = superParser(kProcDirectory + kStatFilename, {}, {"cpu"});
-  int indexes [6]= {0, 1, 2, 5, 6, 7};
-  for(int index : indexes)
-  {
-    activeJiffies += stol(result[index]);
-  }
+  const vector<int> indexes = {0, 1, 2, 5, 6, 7};
+  sumAccordingToIndexes(activeJiffies, indexes, result);
   return activeJiffies;
 }
 
@@ -189,16 +193,18 @@ long LinuxParser::IdleJiffies()
   vector<string> result;
   long idleJiffies = 0;
   result = superParser(kProcDirectory + kStatFilename, {}, {"cpu"});
-  int indexes [2]= {3, 4};
-  for(int index : indexes)
-  {
-    idleJiffies += stol(result[index]);
-  }
+  const vector<int> indexes = {3, 4};
+  sumAccordingToIndexes(idleJiffies, indexes, result);
   return idleJiffies;
 }
 
 // TODO: Read and return CPU utilization
-vector<string> LinuxParser::CpuUtilization() { return {}; }
+vector<string> LinuxParser::CpuUtilization() 
+{
+  vector<string> result;
+  result = superParser(kProcDirectory + kStatFilename, {}, {"cpu"});
+  return result;
+}
 
 // Reads and returns the total number of processes
 int LinuxParser::TotalProcesses() 
@@ -233,7 +239,11 @@ string LinuxParser::Ram(int pid)
   vector<vector<char>> const replacements = {{' ', '_'}};
   string path = kProcDirectory + to_string(pid) + kStatusFilename;
   result = superParser(path, {}, {"VmSize:"});
-  return to_string(stol(result[0])/1000) + " " + result[1];
+  if(result.size() == 1)
+  {
+    result.push_back("KB");
+  }
+  return to_string(stof(result[0])/1000.0f) + " MB";
 }
 
 // Reads and returns the user ID associated with a process

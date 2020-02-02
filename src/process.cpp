@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include "process.h"
 #include "linux_parser.h"
@@ -58,22 +59,14 @@ long int Process::UpTime()
 
 // Overloads the "less than" comparison operator for Process objects
 // REMOVE: [[maybe_unused]] once you define the function
-bool Process::operator<(Process const& a) const 
+bool Process::operator<(Process& a)  
 { 
-    if(this->RamMB(_ram) < a.RamMB(_ram))
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-    
+    return this->RamMB(_ram) <= a.RamMB(_ram);    
 }
 
-long Process::RamMB(string ram) 
+double Process::RamMB(string ram) 
 {
     istringstream streamer(ram);
     streamer >> ram;
-    return stol(ram);
+    return stod(ram);
 }
